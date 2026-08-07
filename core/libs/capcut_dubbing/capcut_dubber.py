@@ -402,11 +402,27 @@ class PiperEngine:
                 self.process.stdin.write(payload)
                 self.process.stdin.flush()
                 
-                out_line = self.process.stdout.readline()
-                if not out_line:
-                    err_msg = "stdout trả về rỗng, process đã chết. Restarting..."
+                # Hàm đọc có timeout để chống treo (deadlock) Piper
+                import concurrent.futures
+                def readline_with_timeout(f, timeout_sec):
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                        future = pool.submit(f.readline)
+                        try:
+                            return future.result(timeout=timeout_sec)
+                        except concurrent.futures.TimeoutError:
+                            return None
+                
+                # Đợi tối đa 20s cho một câu thoại
+                out_line = readline_with_timeout(self.process.stdout, 20)
+                
+                if out_line is None:
+                    err_msg = "stdout trả về rỗng hoặc bị treo (Timeout > 20s). Force kill & Restarting..."
                     print(f"[Piper] {err_msg}", file=sys.stderr)
                     log_debug(err_msg)
+                    try:
+                        self.process.kill()
+                    except:
+                        pass
                     self._start_process()
                     return None
                     
@@ -422,11 +438,19 @@ class PiperEngine:
                 err_msg = "BrokenPipeError - process đã chết bất ngờ. Restarting..."
                 print(f"[Piper] {err_msg}", file=sys.stderr)
                 log_debug(err_msg)
+                try:
+                    self.process.kill()
+                except:
+                    pass
                 self._start_process()
             except Exception as e:
                 err_msg = f"Lỗi: {type(e).__name__}: {e}"
                 print(f"[Piper] {err_msg}", file=sys.stderr)
                 log_debug(err_msg)
+                try:
+                    self.process.kill()
+                except:
+                    pass
                 self._start_process()
         return None
 
