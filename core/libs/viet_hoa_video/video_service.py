@@ -42,11 +42,12 @@ class VideoService:
             if match:
                 url = f"https://www.douyin.com/video/{match.group(1)}"
 
-        print("Đang gọi API Douyin_TikTok_Download_API để xử lý siêu tốc...")
-        api_url = f"https://api.douyin.wtf/api/hybrid/video_data?url={url}&minimal=false"
+        if is_tiktok_douyin_bili:
+            print("Đang gọi API Douyin_TikTok_Download_API để xử lý siêu tốc...")
+            api_url = "https://douyin.wtf/api/hybrid/video_data"
             try:
-                # Douyin WTF API không cần API Key, timeout 20s
-                response = requests.get(api_url, timeout=20)
+                # Dùng params để requests tự động mã hóa URL (tránh lỗi khi link có chứa tham số query)
+                response = requests.get(api_url, params={"url": url, "minimal": "false"}, timeout=60)
                 data = response.json()
                 
                 if data.get("code") == 200:
