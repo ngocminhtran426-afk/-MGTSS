@@ -254,21 +254,35 @@ def main():
     raw_results.sort(key=lambda x: x[0])
     
     # Merge subtitle intervals
+    import difflib
     blocks = []
     current_text = ""
     current_start = 0
     current_end = 0
     
     for timestamp, text in raw_results:
-        # Nếu câu giống hệ thống câu trước, chỉ cần nới rộng thời gian kết thúc
-        if text == current_text:
+        text = text.strip()
+        if not text:
+            continue
+            
+        # Tính độ tương đồng giữa câu hiện tại và câu trước đó
+        similarity = 0
+        if current_text:
+            matcher = difflib.SequenceMatcher(None, current_text.lower(), text.lower())
+            similarity = matcher.ratio()
+            
+        # Nếu câu giống hệ thống câu trước (trên 80%), chỉ cần nới rộng thời gian kết thúc
+        # Giữ lại đoạn text dài hơn (nhiều thông tin hơn)
+        if similarity > 0.8:
             current_end = timestamp
+            if len(text) > len(current_text):
+                current_text = text
         else:
             # Lưu câu cũ
             if current_text and len(current_text) > 1:
                 blocks.append({
                     'start': current_start,
-                    'end': timestamp,
+                    'end': current_end + 500, # Nới thêm 500ms để sub không bị giật cục
                     'text': current_text
                 })
             # Bắt đầu câu mới
@@ -280,7 +294,7 @@ def main():
     if current_text and len(current_text) > 1:
         blocks.append({
             'start': current_start,
-            'end': current_end if current_end > current_start else current_start + 2000,
+            'end': current_end + 1000,
             'text': current_text
         })
         
