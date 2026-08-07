@@ -1,0 +1,8 @@
+-r ../viet_hoa_video/requirements.txt
+gradio>=5.49.1
+srt
+pydub
+requests
+easyocr
+-e ../VieNeu-TTS-main
+psutil

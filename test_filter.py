@@ -1,0 +1,1 @@
+import sys; sys.path.append(rsrc\modules\capcut_dubbing); from template_engine import build_ffmpeg_filter_complex_with_template; tpl = {elements: [{type: text, text: Hello World, x: 0.1, y: 0.1, width: 0.5, height: 0.1}]}; print(build_ffmpeg_filter_complex_with_template(tpl, 1920, 1080, scale=1920:1080, ", sub, 1.0, False, 0, 1, {}, 0.0, 5.0, 5.0))

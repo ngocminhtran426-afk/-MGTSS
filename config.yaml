@@ -1,0 +1,12 @@
+# Main configuration file
+
+# API Keys
+api:
+  google_genai_key: ""
+  capcut_token: ""
+
+# Settings
+app:
+  output_dir: "./storage/output"
+  temp_dir: "./storage/temp"
+  language: "vi"

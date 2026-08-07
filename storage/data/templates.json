@@ -1,0 +1,83 @@
+[
+  {
+    "id": "tpl_1785086804215",
+    "name": "1 vien",
+    "bgmPath": "assets/9bdae68e_For Your Future.mp3",
+    "bgmVolume": 10.0,
+    "bgmSpeed": 1.2999999999999998,
+    "elements": [
+      {
+        "type": "watermark",
+        "x": -0.0049,
+        "y": 0.8815,
+        "width": 1.0157,
+        "height": 0.1309,
+        "logoPath": "assets/04c8e414_images.jpg",
+        "opacity": 0.8
+      },
+      {
+        "type": "watermark",
+        "x": -0.0069,
+        "y": -0.0491,
+        "width": 1.0216,
+        "height": 0.1571,
+        "logoPath": "assets/a939deb6_images.jpg",
+        "opacity": 0.8
+      },
+      {
+        "type": "watermark",
+        "x": -0.0029,
+        "y": -0.0002,
+        "width": 0.1276,
+        "height": 0.1973,
+        "logoPath": "assets/c761d60f_Logo.png",
+        "opacity": 0.8
+      },
+      {
+        "type": "blur",
+        "x": 0.0139,
+        "y": 0.2969,
+        "width": 0.0242,
+        "height": 0.3276,
+        "blurStrength": 15,
+        "blurType": "box"
+      },
+      {
+        "type": "blur",
+        "x": 0.9597,
+        "y": 0.2987,
+        "width": 0.0254,
+        "height": 0.3171,
+        "blurStrength": 15,
+        "blurType": "box"
+      },
+      {
+        "type": "text",
+        "x": 0.0404,
+        "y": 0.883,
+        "width": 0.9182,
+        "height": 0.1175,
+        "text": "[TEN_VIDEO]",
+        "fontSize": 48,
+        "fontColor": "#FF9500",
+        "borderWidth": 5,
+        "borderColor": "black"
+      },
+      {
+        "type": "text",
+        "x": 0.8057,
+        "y": 0.0047,
+        "width": 0.1808,
+        "height": 0.0987,
+        "text": "MEW REVIEW",
+        "fontSize": 48,
+        "fontColor": "#FFCC00",
+        "borderWidth": 5,
+        "borderColor": "black"
+      }
+    ],
+    "flipHorizontal": false,
+    "rotateAngle": 0.1,
+    "createdAt": "2026-07-26T17:26:44.2155981Z"
+  }
+]

@@ -1,0 +1,43 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environment
+venv/
+env/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Dữ liệu nội bộ sinh ra trong quá trình chạy
+storage/downloads/*
+!storage/downloads/.gitkeep
+
+storage/temp/*
+!storage/temp/.gitkeep
+
+storage/cache/*
+!storage/cache/.gitkeep
+
+storage/output/*
+!storage/output/.gitkeep
+
+storage/logs/*
+!storage/logs/.gitkeep
+
+# Ignore large unused binaries and cache
+core/libs/viet_hoa_video/.browser_profile*
+core/libs/ocr/*.dll
+core/libs/ocr/*.exe
+*.mp4
+*.mp3
+
+# Ignore Secrets and API Keys
+*credentials*.json
+*token*.json
+*apiKeys*.json
+storage/config/*
+!storage/config/.gitkeep
