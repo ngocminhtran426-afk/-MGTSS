@@ -17,6 +17,7 @@ class VideoService:
             'quiet': True,
             'no_warnings': True,
             'extractor_args': {'youtube': ['client=ANDROID,IOS,WEB']},
+            'cookiesfrombrowser': ('chrome',),
         }
 
     def extract_metadata(self, url: str) -> dict:

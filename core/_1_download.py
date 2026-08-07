@@ -34,6 +34,7 @@ def download_video_metadata(url: str, download: bool = True):
             'quiet': False,
             'no_warnings': True,
             'extractor_args': {'youtube': ['client=ANDROID,IOS,WEB']},
+            'cookiesfrombrowser': ('chrome',),
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
