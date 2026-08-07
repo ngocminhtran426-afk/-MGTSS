@@ -789,12 +789,12 @@ def get_best_encoder():
         # Thử NVIDIA NVENC
         res = subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=black:s=128x128", "-c:v", "h264_nvenc", "-t", "0.1", "-f", "null", "-"], capture_output=True)
         if res.returncode == 0:
-            return "h264_nvenc", ["-preset", "p4", "-cq", "20", "-b:v", "0"]
+            return "h264_nvenc", ["-preset", "p4", "-cq", "24", "-b:v", "0"]
             
         # Thử Intel QSV
         res = subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=black:s=128x128", "-c:v", "h264_qsv", "-t", "0.1", "-f", "null", "-"], capture_output=True)
         if res.returncode == 0:
-            return "h264_qsv", ["-preset", "veryfast", "-global_quality", "20"]
+            return "h264_qsv", ["-preset", "veryfast", "-global_quality", "24"]
             
         # Thử AMD AMF
         res = subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=black:s=128x128", "-c:v", "h264_amf", "-t", "0.1", "-f", "null", "-"], capture_output=True)
@@ -804,7 +804,7 @@ def get_best_encoder():
         pass
         
     # Fallback về CPU (cực nhanh nhưng nét hơn)
-    return "libx264", ["-preset", "superfast", "-crf", "20", "-threads", "2"]
+    return "libx264", ["-preset", "veryfast", "-crf", "24", "-threads", "2"]
 
 def render_ffmpeg_chunk(chunk, video_path, out_chunk, video_norm, fps, random_flip=False, template=None, variables=None, total_video_duration=0.0):
     encoder, enc_params = get_best_encoder()
