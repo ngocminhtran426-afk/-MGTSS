@@ -16,6 +16,7 @@ class VideoService:
             'skip_download': True,
             'quiet': True,
             'no_warnings': True,
+            'extractor_args': {'youtube': ['client=ANDROID,IOS,WEB']},
         }
 
     def extract_metadata(self, url: str) -> dict:
