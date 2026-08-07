@@ -129,34 +129,28 @@ class GPUOcrEngine(BaseOcrEngine):
         self.worker_thread.join()
 
 class CPUOcrEngine(BaseOcrEngine):
-    def __init__(self, reader, engine_type, workers=4, max_queue_size=32):
+    def __init__(self, reader, engine_type, workers=1, max_queue_size=32):
         super().__init__(reader, engine_type, max_queue_size)
-        self.workers_count = workers
-        self.executor = ThreadPoolExecutor(max_workers=self.workers_count)
-        self.futures = []
-        self.worker_thread = threading.Thread(target=self._dispatch_loop)
+        self.worker_thread = threading.Thread(target=self._worker_loop)
         self.worker_thread.start()
 
-    def _dispatch_loop(self):
+    def _worker_loop(self):
         while self.is_running or not self.job_queue.empty():
             try:
                 job = self.job_queue.get(timeout=0.5)
                 timestamp, img = job
-                future = self.executor.submit(self._process_single, timestamp, img)
-                self.futures.append(future)
+                
+                text = self._do_ocr(img)
+                if text:
+                    self.results.append((timestamp, text, img))
+                    
+                self.job_queue.task_done()
             except queue.Empty:
                 continue
-
-    def _process_single(self, timestamp, img):
-        text = self._do_ocr(img)
-        if text:
-            self.results.append((timestamp, text, img))
-        self.job_queue.task_done()
 
     def stop(self):
         super().stop()
         self.worker_thread.join()
-        self.executor.shutdown(wait=True)
 
 def main():
     parser = argparse.ArgumentParser(description="Multi-Pass Frame-Perfect OCR Pipeline")
