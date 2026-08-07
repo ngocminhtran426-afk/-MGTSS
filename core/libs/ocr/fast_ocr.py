@@ -8,6 +8,7 @@ import re
 import queue
 import threading
 import time
+import difflib
 from concurrent.futures import ThreadPoolExecutor
 
 def format_time_srt(ms):
@@ -21,6 +22,28 @@ def is_frame_different(curr, prev, threshold=12):
         return True
     diff = cv2.absdiff(curr, prev)
     return np.mean(diff) > threshold
+
+def compare_text_presence(img, ref_img):
+    """
+    Sử dụng Canny Edge Detection và IoU để xác định xem khung hình hiện tại 
+    có chứa dòng chữ giống với khung hình tham chiếu (ref_img) hay không.
+    Rất hiệu quả chống lại background chuyển động.
+    """
+    edges_img = cv2.Canny(img, 100, 200)
+    edges_ref = cv2.Canny(ref_img, 100, 200)
+    
+    # Số lượng pixel cạnh của chữ mẫu
+    ref_edge_pixels = np.sum(edges_ref > 0)
+    if ref_edge_pixels < 10:
+        return 0.0 # Không có chữ hoặc quá mờ
+        
+    # Tính phần giao nhau (Intersection)
+    intersection = cv2.bitwise_and(edges_img, edges_ref)
+    intersection_pixels = np.sum(intersection > 0)
+    
+    # Tỷ lệ khớp (0.0 đến 1.0)
+    match_score = intersection_pixels / ref_edge_pixels
+    return match_score
 
 def init_ocr_reader(lang_list, use_gpu):
     engine_type = "easyocr"
@@ -64,7 +87,6 @@ class BaseOcrEngine:
             pass
             
         text = text.replace('\n', ' ').replace('\r', '').strip()
-        # Clean garbage characters
         text = re.sub(r'[^\w\s\.\?\!,，。？！“”]', '', text).strip()
         return text
 
@@ -85,11 +107,8 @@ class GPUOcrEngine(BaseOcrEngine):
         while self.is_running or not self.job_queue.empty():
             batch = []
             try:
-                # Cố gắng lấy job đầu tiên (block 0.5s để thoát vòng lặp gọn gàng)
                 first_job = self.job_queue.get(timeout=0.5)
                 batch.append(first_job)
-                
-                # Cố gắng nhặt thêm thành micro-batch nếu queue đang có sẵn
                 while len(batch) < self.batch_size:
                     try:
                         job = self.job_queue.get_nowait()
@@ -99,13 +118,10 @@ class GPUOcrEngine(BaseOcrEngine):
             except queue.Empty:
                 continue
                 
-            # Xử lý batch
-            # Vì rapidocr/easyocr thường không hỗ trợ array of arrays tốt từ Python API wrapper,
-            # Ta fallback sang loop tối ưu (Inference siêu nhanh trên GPU)
             for timestamp, img in batch:
                 text = self._do_ocr(img)
                 if text:
-                    self.results.append((timestamp, text))
+                    self.results.append((timestamp, text, img))
                 self.job_queue.task_done()
 
     def stop(self):
@@ -126,8 +142,6 @@ class CPUOcrEngine(BaseOcrEngine):
             try:
                 job = self.job_queue.get(timeout=0.5)
                 timestamp, img = job
-                
-                # Bắn vào ThreadPool để tận dụng Multi-core CPU
                 future = self.executor.submit(self._process_single, timestamp, img)
                 self.futures.append(future)
             except queue.Empty:
@@ -136,8 +150,7 @@ class CPUOcrEngine(BaseOcrEngine):
     def _process_single(self, timestamp, img):
         text = self._do_ocr(img)
         if text:
-            # list.append là thread-safe trong CPython nhờ GIL
-            self.results.append((timestamp, text))
+            self.results.append((timestamp, text, img))
         self.job_queue.task_done()
 
     def stop(self):
@@ -146,18 +159,17 @@ class CPUOcrEngine(BaseOcrEngine):
         self.executor.shutdown(wait=True)
 
 def main():
-    parser = argparse.ArgumentParser(description="Adaptive OCR Pipeline (GPU/CPU Thích ứng)")
+    parser = argparse.ArgumentParser(description="Multi-Pass Frame-Perfect OCR Pipeline")
     parser.add_argument('--video', type=str, required=True, help="Đường dẫn đến file video")
     parser.add_argument('--out_srt', type=str, required=True, help="Đường dẫn xuất file SRT")
     parser.add_argument('--crop', type=str, help="Tọa độ cắt ảnh: y_min,y_max,x_min,x_max")
     parser.add_argument('--langs', type=str, default="vi,en", help="Ngôn ngữ OCR")
-    parser.add_argument('--device', type=str, default="auto", choices=['auto', 'gpu', 'cpu'], help="Thiết bị chạy OCR")
-    parser.add_argument('--workers', type=int, default=0, help="Số lượng CPU worker (0 = auto)")
-    parser.add_argument('--batch_size', type=int, default=8, help="Kích thước micro-batch trên GPU")
+    parser.add_argument('--device', type=str, default="auto", choices=['auto', 'gpu', 'cpu'])
+    parser.add_argument('--workers', type=int, default=0)
+    parser.add_argument('--batch_size', type=int, default=8)
     
     args = parser.parse_args()
     
-    # 1. Phát hiện phần cứng
     use_gpu = False
     if args.device == 'auto':
         import torch
@@ -168,34 +180,29 @@ def main():
             print("Không tìm thấy CUDA. Chế độ: CPU Workers")
     elif args.device == 'gpu':
         use_gpu = True
-        import torch
-        if not torch.cuda.is_available():
-            print("[CẢNH BÁO] Bạn đã ép chạy GPU nhưng không tìm thấy CUDA!")
     else:
         use_gpu = False
-        print("Chế độ ép buộc: CPU Workers")
         
-    # 2. Khởi tạo Engine
     lang_list = args.langs.split(',')
     reader, engine_type = init_ocr_reader(lang_list, use_gpu)
     
     if use_gpu:
-        ocr_engine = GPUOcrEngine(reader, engine_type, batch_size=args.batch_size, max_queue_size=32)
+        ocr_engine = GPUOcrEngine(reader, engine_type, batch_size=args.batch_size, max_queue_size=64)
     else:
         workers = args.workers if args.workers > 0 else max(2, min(8, os.cpu_count() // 2))
-        print(f"Khởi tạo Pool với {workers} CPU Workers.")
-        ocr_engine = CPUOcrEngine(reader, engine_type, workers=workers, max_queue_size=32)
+        ocr_engine = CPUOcrEngine(reader, engine_type, workers=workers, max_queue_size=64)
         
-    # 3. Phân tích Video (Tầng 1 - Giảm thiểu OCR)
     cap = cv2.VideoCapture(args.video)
     if not cap.isOpened():
         print(f"[ERROR] Không thể mở video: {args.video}")
         return
         
     fps = cap.get(cv2.CAP_PROP_FPS)
-    if fps <= 0: fps = 25.0
-    frame_step = int(fps / 2)
-    if frame_step == 0: frame_step = 1
+    if fps <= 0: fps = 30.0
+    
+    # PASS 1: Sparse Scan (3 FPS)
+    sparse_fps = 3.0
+    frame_step = max(1, int(fps / sparse_fps))
     
     crop_coords = (0.75, 1.0, 0.0, 1.0)
     if args.crop:
@@ -206,9 +213,9 @@ def main():
     y_min, y_max, x_min, x_max = crop_coords
     
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    print(f"\nBắt đầu quét Video (kiểm tra mỗi {frame_step} khung hình)...")
+    print(f"\n[PASS 1] Bắt đầu quét thưa Video ({sparse_fps} FPS) để tìm nội dung phụ đề...")
     
-    pbar = tqdm(total=total_frames // frame_step, desc="Đọc Video & Gửi OCR", file=sys.stdout)
+    pbar = tqdm(total=total_frames // frame_step, desc="Sparse OCR Scan", file=sys.stdout)
     f_idx = 0
     prev_crop = None
     
@@ -231,78 +238,107 @@ def main():
         gray = cv2.cvtColor(crop_img, cv2.COLOR_BGR2GRAY)
         current_time_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
         
-        # Debounce / Deduplicate
-        if is_frame_different(gray, prev_crop, threshold=12):
+        if is_frame_different(gray, prev_crop, threshold=10):
             prev_crop = gray
-            # Put vào Bounded Queue (Sẽ BLOCK luồng đọc video này nếu hàng đợi quá đầy)
-            # Điều này tạo Backpressure tuyệt vời, tránh nổ RAM
-            ocr_engine.job_queue.put((current_time_ms, crop_img))
+            ocr_engine.job_queue.put((current_time_ms, gray))
             
         pbar.update(1)
         f_idx += 1
         
     pbar.close()
     
-    # 4. Hậu xử lý (Tầng 3)
-    print("\nĐang chờ các tiến trình OCR hoàn tất...")
-    ocr_engine.stop() # Wait for workers to finish
+    print("\nĐang chờ các luồng OCR hoàn tất (Pass 1)...")
+    ocr_engine.stop()
     
     raw_results = ocr_engine.get_results()
-    print(f"Thu thập được {len(raw_results)} kết quả OCR thô.")
-    
-    # Sort theo timestamp
     raw_results.sort(key=lambda x: x[0])
     
-    # Merge subtitle intervals
-    import difflib
+    # Temporal Grouping (Gộp các cụm giống nhau bằng difflib)
     blocks = []
-    current_text = ""
-    current_start = 0
-    current_end = 0
-    
-    for timestamp, text in raw_results:
-        text = text.strip()
-        if not text:
-            continue
-            
-        # Tính độ tương đồng giữa câu hiện tại và câu trước đó
-        similarity = 0
-        if current_text:
-            matcher = difflib.SequenceMatcher(None, current_text.lower(), text.lower())
-            similarity = matcher.ratio()
-            
-        # Nếu câu giống hệ thống câu trước (trên 80%), chỉ cần nới rộng thời gian kết thúc
-        # Giữ lại đoạn text dài hơn (nhiều thông tin hơn)
-        if similarity > 0.8:
-            current_end = timestamp
-            if len(text) > len(current_text):
-                current_text = text
+    for ts, text, img in raw_results:
+        if len(text) < 2: continue
+        if not blocks:
+            blocks.append({'text': text, 'start': ts, 'end': ts, 'ref_img': img})
         else:
-            # Lưu câu cũ
-            if current_text and len(current_text) > 1:
-                blocks.append({
-                    'start': current_start,
-                    'end': current_end + 500, # Nới thêm 500ms để sub không bị giật cục
-                    'text': current_text
-                })
-            # Bắt đầu câu mới
-            current_text = text
-            current_start = timestamp
-            current_end = timestamp
-            
-    # Lưu câu cuối cùng
-    if current_text and len(current_text) > 1:
-        blocks.append({
-            'start': current_start,
-            'end': current_end + 1000,
-            'text': current_text
-        })
+            prev = blocks[-1]
+            ratio = difflib.SequenceMatcher(None, text, prev['text']).ratio()
+            if ratio > 0.8:
+                prev['end'] = ts
+                if len(text) > len(prev['text']):
+                    prev['text'] = text
+                    prev['ref_img'] = img # Cập nhật ảnh tham chiếu nét hơn
+            else:
+                # Nếu cách nhau quá xa (vô lý), không nối
+                if ts - prev['end'] < 2000:
+                    blocks.append({'text': text, 'start': ts, 'end': ts, 'ref_img': img})
+                else:
+                    blocks.append({'text': text, 'start': ts, 'end': ts, 'ref_img': img})
+
+    # PASS 2: Dense Frame Alignment (Native FPS)
+    print(f"\n[PASS 2] Khớp khung hình chuẩn xác (Dense Scan - {fps} FPS) cho {len(blocks)} câu phụ đề...")
+    
+    final_blocks = []
+    pbar2 = tqdm(total=len(blocks), desc="Frame Alignment", file=sys.stdout)
+    
+    for block in blocks:
+        # Tìm START chính xác
+        search_start_ms = max(0, block['start'] - 1500)
+        cap.set(cv2.CAP_PROP_POS_MSEC, search_start_ms)
         
-    # Viết SRT
-    print(f"Lưu kết quả SRT: {args.out_srt}")
+        exact_start = block['start']
+        exact_end = block['end']
+        
+        # Quét tới để tìm khung hình đầu tiên khớp
+        while True:
+            curr_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+            if curr_ms > block['start'] + 500: # Vượt quá ngưỡng an toàn
+                break
+            ret, frame = cap.read()
+            if not ret: break
+            
+            crop_img = frame[y1:y2, x1:x2]
+            gray = cv2.cvtColor(crop_img, cv2.COLOR_BGR2GRAY)
+            
+            score = compare_text_presence(gray, block['ref_img'])
+            if score > 0.35: # Ngưỡng khớp cạnh (Edge Match)
+                exact_start = curr_ms
+                break
+                
+        # Tìm END chính xác
+        search_end_start_ms = max(exact_start + 500, block['end'] - 1000)
+        cap.set(cv2.CAP_PROP_POS_MSEC, search_end_start_ms)
+        
+        while True:
+            curr_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+            if curr_ms > block['end'] + 1500:
+                break
+            ret, frame = cap.read()
+            if not ret: break
+            
+            crop_img = frame[y1:y2, x1:x2]
+            gray = cv2.cvtColor(crop_img, cv2.COLOR_BGR2GRAY)
+            
+            score = compare_text_presence(gray, block['ref_img'])
+            if score < 0.2: # Chữ đã biến mất
+                exact_end = curr_ms
+                break
+            else:
+                exact_end = curr_ms # Cập nhật liên tục khi vẫn còn chữ
+                
+        final_blocks.append({
+            'start': exact_start,
+            'end': exact_end,
+            'text': block['text']
+        })
+        pbar2.update(1)
+        
+    pbar2.close()
+    cap.release()
+    
+    print(f"\n[PASS 3] Lưu kết quả SRT siêu chuẩn xác: {args.out_srt}")
     with open(args.out_srt, 'w', encoding='utf-8') as f:
         idx = 1
-        for b in blocks:
+        for b in final_blocks:
             s_str = format_time_srt(b['start'])
             e_str = format_time_srt(b['end'])
             f.write(f"{idx}\n{s_str} --> {e_str}\n{b['text']}\n\n")
