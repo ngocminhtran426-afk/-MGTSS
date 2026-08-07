@@ -16,7 +16,7 @@ class VideoService:
             'skip_download': True,
             'quiet': True,
             'no_warnings': True,
-            'extractor_args': {'youtube': ['client=ANDROID,IOS,WEB']},
+            'extractor_args': {'youtube': {'player_client': ['android']}},
         }
         if os.path.exists('cookies.txt'):
             self.ydl_opts['cookiefile'] = 'cookies.txt'

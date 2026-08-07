@@ -33,7 +33,7 @@ def download_video_metadata(url: str, download: bool = True):
             'outtmpl': os.path.join(download_dir, '%(id)s.%(ext)s'),
             'quiet': False,
             'no_warnings': True,
-            'extractor_args': {'youtube': ['client=ANDROID,IOS,WEB']},
+            'extractor_args': {'youtube': {'player_client': ['android']}},
         }
         
         if os.path.exists('cookies.txt'):
