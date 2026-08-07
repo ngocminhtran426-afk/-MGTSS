@@ -207,6 +207,7 @@ def main():
     y_min, y_max, x_min, x_max = crop_coords
     
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    total_dur_ms = (total_frames / fps) * 1000.0
     print(f"\n[PASS 1] Bắt đầu quét thưa Video ({sparse_fps} FPS) để tìm nội dung phụ đề...")
     
     pbar = tqdm(total=total_frames // frame_step, desc="Sparse OCR Scan", file=sys.stdout)
@@ -230,7 +231,7 @@ def main():
         crop_img = frame[y1:y2, x1:x2]
         
         gray = cv2.cvtColor(crop_img, cv2.COLOR_BGR2GRAY)
-        current_time_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+        current_time_ms = (f_idx / fps) * 1000.0 # BẢO MẬT: Tính thời gian bằng toán học, tránh lỗi OpenCV trả về rác
         
         if is_frame_different(gray, prev_crop, threshold=10):
             prev_crop = gray
@@ -284,7 +285,8 @@ def main():
         
         # Quét tới để tìm khung hình đầu tiên khớp
         while True:
-            curr_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+            # Fix lỗi timestamp ảo của OpenCV
+            curr_ms = (cap.get(cv2.CAP_PROP_POS_FRAMES) / fps) * 1000.0
             if curr_ms > block['start'] + 500: # Vượt quá ngưỡng an toàn
                 break
             ret, frame = cap.read()
@@ -295,7 +297,7 @@ def main():
             
             score = compare_text_presence(gray, block['ref_img'])
             if score > 0.35: # Ngưỡng khớp cạnh (Edge Match)
-                exact_start = curr_ms
+                exact_start = min(curr_ms, total_dur_ms)
                 break
                 
         # Tìm END chính xác
@@ -303,7 +305,8 @@ def main():
         cap.set(cv2.CAP_PROP_POS_MSEC, search_end_start_ms)
         
         while True:
-            curr_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+            # Fix lỗi timestamp ảo của OpenCV
+            curr_ms = (cap.get(cv2.CAP_PROP_POS_FRAMES) / fps) * 1000.0
             if curr_ms > block['end'] + 1500:
                 break
             ret, frame = cap.read()
@@ -314,10 +317,10 @@ def main():
             
             score = compare_text_presence(gray, block['ref_img'])
             if score < 0.2: # Chữ đã biến mất
-                exact_end = curr_ms
+                exact_end = min(curr_ms, total_dur_ms)
                 break
             else:
-                exact_end = curr_ms # Cập nhật liên tục khi vẫn còn chữ
+                exact_end = min(curr_ms, total_dur_ms) # Cập nhật liên tục khi vẫn còn chữ
                 
         final_blocks.append({
             'start': exact_start,
