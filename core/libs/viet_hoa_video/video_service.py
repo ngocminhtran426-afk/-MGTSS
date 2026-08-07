@@ -4,6 +4,7 @@ Sử dụng yt-dlp để hỗ trợ YouTube, TikTok, Facebook, Instagram, v.v.
 """
 
 import os
+import sys
 import requests
 import yt_dlp
 
@@ -20,7 +21,7 @@ class VideoService:
         }
         if os.path.exists('cookies.txt'):
             self.ydl_opts['cookiefile'] = 'cookies.txt'
-        else:
+        elif sys.platform.startswith('win'):
             self.ydl_opts['cookiesfrombrowser'] = ('chrome',)
 
     def extract_metadata(self, url: str) -> dict:

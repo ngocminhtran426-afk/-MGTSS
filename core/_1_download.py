@@ -38,7 +38,7 @@ def download_video_metadata(url: str, download: bool = True):
         
         if os.path.exists('cookies.txt'):
             ydl_opts['cookiefile'] = 'cookies.txt'
-        else:
+        elif sys.platform.startswith('win'):
             ydl_opts['cookiesfrombrowser'] = ('chrome',)
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
