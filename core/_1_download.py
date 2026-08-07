@@ -34,8 +34,12 @@ def download_video_metadata(url: str, download: bool = True):
             'quiet': False,
             'no_warnings': True,
             'extractor_args': {'youtube': ['client=ANDROID,IOS,WEB']},
-            'cookiesfrombrowser': ('chrome',),
         }
+        
+        if os.path.exists('cookies.txt'):
+            ydl_opts['cookiefile'] = 'cookies.txt'
+        else:
+            ydl_opts['cookiesfrombrowser'] = ('chrome',)
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             # Download the video

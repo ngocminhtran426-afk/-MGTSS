@@ -17,8 +17,11 @@ class VideoService:
             'quiet': True,
             'no_warnings': True,
             'extractor_args': {'youtube': ['client=ANDROID,IOS,WEB']},
-            'cookiesfrombrowser': ('chrome',),
         }
+        if os.path.exists('cookies.txt'):
+            self.ydl_opts['cookiefile'] = 'cookies.txt'
+        else:
+            self.ydl_opts['cookiesfrombrowser'] = ('chrome',)
 
     def extract_metadata(self, url: str) -> dict:
         """
