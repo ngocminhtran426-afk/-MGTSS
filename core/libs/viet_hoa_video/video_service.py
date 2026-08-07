@@ -35,9 +35,15 @@ class VideoService:
         # Chuyển hướng cho TikTok, Douyin, Bilibili sang Douyin_TikTok_Download_API
         is_tiktok_douyin_bili = any(domain in url.lower() for domain in ['tiktok.com', 'douyin.com', 'bilibili.com'])
         
-        if is_tiktok_douyin_bili:
-            print("Đang gọi API Douyin_TikTok_Download_API để xử lý siêu tốc...")
-            api_url = f"https://api.douyin.wtf/api/hybrid/video_data?url={url}&minimal=false"
+        # Convert douyin jingxuan URL to standard video URL
+        import re
+        if 'douyin.com' in url and 'modal_id=' in url:
+            match = re.search(r'modal_id=(\d+)', url)
+            if match:
+                url = f"https://www.douyin.com/video/{match.group(1)}"
+
+        print("Đang gọi API Douyin_TikTok_Download_API để xử lý siêu tốc...")
+        api_url = f"https://api.douyin.wtf/api/hybrid/video_data?url={url}&minimal=false"
             try:
                 # Douyin WTF API không cần API Key, timeout 20s
                 response = requests.get(api_url, timeout=20)
