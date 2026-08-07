@@ -172,16 +172,29 @@ def request_with_retry(text, args, max_retries=10):
                 
                 with ip_lock:
                     if time.time() - last_ip_change > 20:
-                        print("\n>> Kích hoạt WARP-CLI: Disconnecting...")
-                        subprocess.run(["warp-cli", "disconnect"], capture_output=True)
-                        time.sleep(3)
-                        
-                        print(">> Kích hoạt WARP-CLI: Connecting...")
-                        subprocess.run(["warp-cli", "connect"], capture_output=True)
-                        time.sleep(8)
-                        
-                        last_ip_change = time.time()
-                        print(">> Đã đổi IP xong, các luồng tiếp tục chạy!\n")
+                        try:
+                            print("\n>> Kích hoạt WARP-CLI: Disconnecting...")
+                            subprocess.run(["warp-cli", "disconnect"], capture_output=True, timeout=15)
+                            time.sleep(3)
+                            
+                            print(">> Kích hoạt WARP-CLI: Connecting...")
+                            subprocess.run(["warp-cli", "connect"], capture_output=True, timeout=15)
+                            time.sleep(8)
+                            
+                            last_ip_change = time.time()
+                            print(">> Đã đổi IP xong, các luồng tiếp tục chạy!\n")
+                        except FileNotFoundError:
+                            print("\n[!] CẢNH BÁO: Không tìm thấy WARP-CLI trên hệ thống! Không thể tự động đổi IP. Sẽ đợi 30s trước khi thử lại...")
+                            time.sleep(30)
+                            last_ip_change = time.time()
+                        except subprocess.TimeoutExpired:
+                            print("\n[!] CẢNH BÁO: WARP-CLI bị treo (timeout)! Bỏ qua đổi IP, sẽ đợi 30s...")
+                            time.sleep(30)
+                            last_ip_change = time.time()
+                        except Exception as e:
+                            print(f"\n[!] Lỗi khi đổi IP: {e}")
+                            time.sleep(10)
+                            last_ip_change = time.time()
                     else:
                         time.sleep(2)
                 
