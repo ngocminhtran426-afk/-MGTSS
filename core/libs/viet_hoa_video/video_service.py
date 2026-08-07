@@ -32,6 +32,47 @@ class VideoService:
             dict với các key: title, description, thumbnail_url, 
                   uploader, duration, platform, video_id
         """
+        # Chuyển hướng cho TikTok, Douyin, Bilibili sang Douyin_TikTok_Download_API
+        is_tiktok_douyin_bili = any(domain in url.lower() for domain in ['tiktok.com', 'douyin.com', 'bilibili.com'])
+        
+        if is_tiktok_douyin_bili:
+            print("Đang gọi API Douyin_TikTok_Download_API để xử lý siêu tốc...")
+            api_url = f"https://api.douyin.wtf/api/hybrid/video_data?url={url}&minimal=false"
+            try:
+                # Douyin WTF API không cần API Key, timeout 20s
+                response = requests.get(api_url, timeout=20)
+                data = response.json()
+                
+                if data.get("code") == 200:
+                    video_data = data.get("data", {})
+                    
+                    # Lấy link mp4 không watermark chất lượng cao
+                    nwm_video_url = video_data.get("video_data", {}).get("nwm_video_url_HQ")
+                    if not nwm_video_url:
+                         nwm_video_url = video_data.get("video_data", {}).get("nwm_video_url")
+                         
+                    # Lấy thông tin khác
+                    title = video_data.get("desc", "Video")
+                    cover = video_data.get("cover_data", {}).get("cover", {}).get("url_list", [""])[0]
+                    author = video_data.get("author", {}).get("nickname", "Unknown")
+                    
+                    if nwm_video_url:
+                        return {
+                            'title': title,
+                            'description': title,
+                            'thumbnail_url': cover,
+                            'uploader': author,
+                            'duration': 0,
+                            'platform': 'tiktok_douyin_api',
+                            'video_id': video_data.get("aweme_id", ""),
+                            'view_count': 0,
+                            'url': url,
+                            'direct_mp4_url': nwm_video_url
+                        }
+            except Exception as e:
+                print(f"Lỗi khi gọi API api.douyin.wtf: {e}. Sẽ dùng yt-dlp dự phòng.")
+        
+        # Luồng cũ: YouTube hoặc khi API thất bại
         import subprocess
         import sys
         try:
