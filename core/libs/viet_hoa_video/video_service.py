@@ -32,6 +32,16 @@ class VideoService:
             dict với các key: title, description, thumbnail_url, 
                   uploader, duration, platform, video_id
         """
+        import subprocess
+        import sys
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"])
+            if 'yt_dlp' in sys.modules:
+                del sys.modules['yt_dlp']
+        except Exception:
+            pass
+            
+        import yt_dlp
         with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
 

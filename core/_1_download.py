@@ -14,6 +14,15 @@ def download_video_metadata(url: str, download: bool = True):
     Trích xuất metadata và tải video từ URL.
     Wrapper gọi VideoService từ thư viện cũ.
     """
+    import subprocess
+    import sys
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"])
+        if 'yt_dlp' in sys.modules:
+            del sys.modules['yt_dlp']
+    except Exception as e:
+        print(f"Warning: Không thể cập nhật yt-dlp: {e}")
+
     print(f"Bắt đầu lấy metadata cho URL: {url}")
     service = VideoService()
     metadata = service.extract_metadata(url)
