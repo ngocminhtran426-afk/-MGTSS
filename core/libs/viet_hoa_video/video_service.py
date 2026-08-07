@@ -53,11 +53,22 @@ class VideoService:
                 if data.get("code") == 200:
                     video_data = data.get("data", {})
                     
-                    # Lấy link mp4 không watermark chất lượng cao
-                    nwm_video_url = video_data.get("video_data", {}).get("nwm_video_url_HQ")
+                    # Lấy link mp4 không watermark (Hỗ trợ cả format API mới và cũ)
+                    nwm_video_url = None
+                    
+                    # Format mới (data -> video -> play_addr -> url_list)
+                    try:
+                        url_list = video_data.get("video", {}).get("play_addr", {}).get("url_list", [])
+                        if url_list:
+                            nwm_video_url = url_list[0]
+                    except Exception:
+                        pass
+                        
+                    # Format cũ (video_data -> nwm_video_url_HQ)
                     if not nwm_video_url:
-                         nwm_video_url = video_data.get("video_data", {}).get("nwm_video_url")
-                         
+                        nwm_video_url = video_data.get("video_data", {}).get("nwm_video_url_HQ")
+                    if not nwm_video_url:
+                        nwm_video_url = video_data.get("video_data", {}).get("nwm_video_url")
                     # Lấy thông tin khác
                     title = video_data.get("desc", "Video")
                     cover = video_data.get("cover_data", {}).get("cover", {}).get("url_list", [""])[0]
